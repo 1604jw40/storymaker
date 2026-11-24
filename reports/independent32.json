@@ -1,0 +1,179 @@
+{
+  "prompts": 32,
+  "scoring": "GPT-4.1, one generation seed",
+  "models": {
+    "original": {
+      "valid_judgments": 32,
+      "eos_count": 29,
+      "strict_format_count": 29,
+      "cutoff_count": 3,
+      "exact_prefix_repeat_count": 20,
+      "high_reward_anchor_count": 2,
+      "quality_anchor_unknown": 0,
+      "diagnostics": {
+        "novelty": {
+          "mean": 3.8125,
+          "denominator": 32,
+          "below_three": 2
+        },
+        "completion": {
+          "mean": 2.03125,
+          "denominator": 32,
+          "below_three": 22
+        },
+        "moral": {
+          "mean": 2.5,
+          "denominator": 32,
+          "below_three": 17
+        },
+        "causality": {
+          "mean": 1.875,
+          "denominator": 32,
+          "below_three": 23
+        },
+        "emotion": {
+          "mean": 2.59375,
+          "denominator": 32,
+          "below_three": 16
+        },
+        "read_aloud": {
+          "mean": 2.71875,
+          "denominator": 32,
+          "below_three": 12
+        },
+        "scene_density": {
+          "mean": 1.65625,
+          "denominator": 32,
+          "below_three": 22
+        },
+        "text_visual": {
+          "mean": 3.375,
+          "denominator": 32,
+          "below_three": 7
+        },
+        "age_fit": {
+          "mean": 3.84375,
+          "denominator": 32,
+          "below_three": 1
+        }
+      }
+    },
+    "update_0004": {
+      "valid_judgments": 32,
+      "eos_count": 31,
+      "strict_format_count": 31,
+      "cutoff_count": 1,
+      "exact_prefix_repeat_count": 13,
+      "high_reward_anchor_count": 8,
+      "quality_anchor_unknown": 0,
+      "diagnostics": {
+        "novelty": {
+          "mean": 3.875,
+          "denominator": 32,
+          "below_three": 0
+        },
+        "completion": {
+          "mean": 2.5,
+          "denominator": 32,
+          "below_three": 16
+        },
+        "moral": {
+          "mean": 2.96875,
+          "denominator": 32,
+          "below_three": 11
+        },
+        "causality": {
+          "mean": 2.1875,
+          "denominator": 32,
+          "below_three": 19
+        },
+        "emotion": {
+          "mean": 3.125,
+          "denominator": 32,
+          "below_three": 10
+        },
+        "read_aloud": {
+          "mean": 3.03125,
+          "denominator": 32,
+          "below_three": 8
+        },
+        "scene_density": {
+          "mean": 2.40625,
+          "denominator": 32,
+          "below_three": 14
+        },
+        "text_visual": {
+          "mean": 3.5,
+          "denominator": 32,
+          "below_three": 6
+        },
+        "age_fit": {
+          "mean": 3.8125,
+          "denominator": 32,
+          "below_three": 1
+        }
+      }
+    },
+    "update_0018": {
+      "valid_judgments": 31,
+      "eos_count": 32,
+      "strict_format_count": 30,
+      "cutoff_count": 0,
+      "exact_prefix_repeat_count": 15,
+      "high_reward_anchor_count": 3,
+      "quality_anchor_unknown": 1,
+      "diagnostics": {
+        "novelty": {
+          "mean": 3.967741935483871,
+          "denominator": 31,
+          "below_three": 0
+        },
+        "completion": {
+          "mean": 2.5483870967741935,
+          "denominator": 31,
+          "below_three": 14
+        },
+        "moral": {
+          "mean": 2.967741935483871,
+          "denominator": 31,
+          "below_three": 10
+        },
+        "causality": {
+          "mean": 2.4516129032258065,
+          "denominator": 31,
+          "below_three": 17
+        },
+        "emotion": {
+          "mean": 3.161290322580645,
+          "denominator": 31,
+          "below_three": 11
+        },
+        "read_aloud": {
+          "mean": 2.838709677419355,
+          "denominator": 31,
+          "below_three": 10
+        },
+        "scene_density": {
+          "mean": 2.193548387096774,
+          "denominator": 31,
+          "below_three": 18
+        },
+        "text_visual": {
+          "mean": 3.6774193548387095,
+          "denominator": 31,
+          "below_three": 2
+        },
+        "age_fit": {
+          "mean": 3.935483870967742,
+          "denominator": 31,
+          "below_three": 0
+        }
+      }
+    }
+  },
+  "unscored": {
+    "model": "update_0018",
+    "count": 1,
+    "reason": "event order and causality judgment disagreed"
+  }
+}

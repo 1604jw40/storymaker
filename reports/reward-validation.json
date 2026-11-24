@@ -1,0 +1,158 @@
+{
+  "status": "candidate not selected",
+  "checks": {
+    "baseline": false,
+    "format_only": false,
+    "exact_repeat": true,
+    "causality": true,
+    "completion": false,
+    "valid_controls": false,
+    "novelty": true,
+    "fatal": true
+  },
+  "passed_count": 4,
+  "total_checks": 8,
+  "cases": {
+    "78_baseline": {
+      "content_score": 7,
+      "expected_content_reward": 0.501826,
+      "candidate_total_reward": 0.501826,
+      "diagnostics": {
+        "scene_density": 4,
+        "causality": 4,
+        "read_aloud": 4,
+        "completion": 4,
+        "novelty": 4
+      },
+      "strict_format_errors": []
+    },
+    "78_traits_array": {
+      "content_score": 8,
+      "expected_content_reward": 0.555535,
+      "candidate_total_reward": 0.3333127777777778,
+      "diagnostics": {
+        "scene_density": 4,
+        "causality": 4,
+        "read_aloud": 4,
+        "completion": 4,
+        "novelty": 4
+      },
+      "strict_format_errors": [
+        "invalid_characters"
+      ]
+    },
+    "78_within_scene_repeat": {
+      "content_score": 3,
+      "expected_content_reward": -0.555189,
+      "candidate_total_reward": -0.555189,
+      "diagnostics": {
+        "scene_density": 1,
+        "causality": 3,
+        "read_aloud": 1,
+        "completion": 3,
+        "novelty": 4
+      },
+      "strict_format_errors": []
+    },
+    "78_premature_result": {
+      "content_score": 2,
+      "expected_content_reward": -0.777778,
+      "candidate_total_reward": -0.777778,
+      "diagnostics": {
+        "scene_density": 4,
+        "causality": 1,
+        "read_aloud": 4,
+        "completion": 1,
+        "novelty": 4
+      },
+      "strict_format_errors": []
+    },
+    "78_question_before_action": {
+      "content_score": 4,
+      "expected_content_reward": -0.145267,
+      "candidate_total_reward": -0.145267,
+      "diagnostics": {
+        "scene_density": 4,
+        "causality": 4,
+        "read_aloud": 4,
+        "completion": 4,
+        "novelty": 4
+      },
+      "strict_format_errors": []
+    },
+    "78_repaired_object": {
+      "content_score": 7,
+      "expected_content_reward": 0.349622,
+      "candidate_total_reward": 0.349622,
+      "diagnostics": {
+        "scene_density": 4,
+        "causality": 4,
+        "read_aloud": 4,
+        "completion": 4,
+        "novelty": 4
+      },
+      "strict_format_errors": []
+    },
+    "23_distinct": {
+      "content_score": 8,
+      "expected_content_reward": 0.903692,
+      "candidate_total_reward": 0.903692,
+      "diagnostics": {
+        "scene_density": 4,
+        "causality": 4,
+        "read_aloud": 4,
+        "completion": 4,
+        "novelty": 4
+      },
+      "strict_format_errors": []
+    },
+    "23_renamed": {
+      "content_score": 3,
+      "expected_content_reward": -0.555588,
+      "candidate_total_reward": -0.555588,
+      "diagnostics": {
+        "scene_density": 4,
+        "causality": 4,
+        "read_aloud": 2,
+        "completion": 4,
+        "novelty": 1
+      },
+      "strict_format_errors": []
+    },
+    "78_duplicate_id": {
+      "content_score": 8,
+      "expected_content_reward": 0.586725,
+      "candidate_total_reward": 0.36450277777777784,
+      "diagnostics": {
+        "scene_density": 4,
+        "causality": 4,
+        "read_aloud": 4,
+        "completion": 4,
+        "novelty": 4
+      },
+      "strict_format_errors": [
+        "duplicate_character_id"
+      ]
+    },
+    "78_open_ending": {
+      "content_score": 4,
+      "expected_content_reward": 0.183001,
+      "candidate_total_reward": 0.183001,
+      "diagnostics": {
+        "scene_density": 4,
+        "causality": 4,
+        "read_aloud": 4,
+        "completion": 4,
+        "novelty": 4
+      },
+      "strict_format_errors": []
+    }
+  },
+  "unresolved_plan_supplement": {
+    "passed": true,
+    "completion": 1,
+    "candidate_total_reward": -0.777778
+  },
+  "api_calls": 13,
+  "policy_updates": 0
+}

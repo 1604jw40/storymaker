@@ -1,0 +1,42 @@
+{
+  "algorithm": "direct-RLAIF, REINFORCE with learned state-value baseline and fixed-reference KL",
+  "trainable_parameterization": "full language backbone, no LoRA; independent value backbone + scalar head",
+  "logical_batch_size": 8,
+  "temperature": 0.9,
+  "top_p": 1.0,
+  "top_k": 0,
+  "max_new_tokens": 4096,
+  "seed": 20261114,
+  "learning_rate": 0.0001,
+  "kl_beta": 0.05,
+  "api_model": "gpt-4.1-2025-04-14",
+  "value_baseline_bounds": [
+    -1,
+    1
+  ],
+  "reward_protocol_kind": "fixed_criteria_diagnosis_then_direct_score",
+  "source_checkpoint": "policy4 / value4",
+  "final_checkpoint": "update_0018",
+  "steps": 13,
+  "train_n": 200,
+  "validation_n": 43,
+  "sft_diagnostic_n": 61,
+  "independent_test_n": 32,
+  "rag_train_story_chunks": 988,
+  "rag_criteria": 11,
+  "sft": {
+    "base": "Qwen3.5-4B",
+    "lora_rank": 8,
+    "lora_alpha": 16,
+    "target": [
+      "q_proj",
+      "v_proj"
+    ],
+    "epochs": 5,
+    "learning_rate": 0.0002,
+    "dropout": 0.05,
+    "weight_decay": 0.01,
+    "train_n": 243,
+    "selected_validation_mean_ce": 1.2064560174942016
+  }
+}

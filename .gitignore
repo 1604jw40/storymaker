@@ -1,0 +1,45 @@
+# Python / editor
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.vscode/
+.idea/
+
+# Local credentials
+.env
+.env.*
+secrets/
+api_key.yaml
+api_key.yml
+*.pem
+*.pfx
+
+# Local data, weights and run artifacts
+/storymaker/data/*
+!/storymaker/data/source/
+/storymaker/data/source/*
+!/storymaker/data/source/system_prompt.txt
+/storymaker/*/models/
+/storymaker/*/results/
+/storymaker/rlaif/rag/
+/storymaker/*/configs/active_run.json
+/storymaker/rlaif/configs/current.json
+/outputs/
+/storymaker/outputs/
+*.safetensors
+*.pt
+*.pth
+*.bin
+*.gguf
+*.onnx
+*.ckpt
+*.npy
+*.npz
+*.sqlite*
+*.jsonl
+*.log
+*.lock
+*.zip
+*.tmp
