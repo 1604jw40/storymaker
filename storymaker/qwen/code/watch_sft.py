@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from storymaker import project as p
-SCRIPT = p.ROOT / "storymaker.qwen.code.sft_v5_train.py"
+SFT_WORKERS = ("sft_v5_train", "hpo_sft")
 INTERVAL = 30
 REQUIRED = (
     "adapter_model.safetensors", "adapter_config.json", "optimizer.pt",
@@ -71,7 +71,8 @@ def processes(run):
     rows = json.loads(result.stdout.decode("utf-8-sig"))
     if isinstance(rows, dict):
         rows = [rows]
-    scripts = (SCRIPT, p.ROOT / "storymaker.qwen.code.hpo_sft.py")
+    scripts = [f"storymaker.qwen.code.{name}" for name in SFT_WORKERS]
+    scripts += [str(p.ROOT / "qwen/code" / f"{name}.py") for name in SFT_WORKERS]
     return [r for r in rows if any(str(script).casefold() in (r.get("CommandLine") or "").casefold() for script in scripts)
             and str(run).casefold() in r["CommandLine"].casefold()
             and "--check-ready" not in r["CommandLine"] and "--prepare-from" not in r["CommandLine"]]
@@ -88,8 +89,8 @@ def gpu_sample():
 
 def readiness(run, config):
     result = subprocess.check_output(
-        [config["python"], "-X", "utf8", str(SCRIPT), "--run-dir", str(run), "--check-ready"],
-        timeout=30,
+        p.worker_command("sft_v5_train.py", "--run-dir", run, "--check-ready", python=config["python"]),
+        cwd=p.ROOT.parent, timeout=30,
     )
     return json.loads(result.decode("utf-8-sig"))
 
@@ -97,7 +98,7 @@ def readiness(run, config):
 def gate(control, status, pause, pointer, run):
     if not control.get("enabled", False):
         return "disabled_by_operator"
-    if Path(pointer["run_dir"]).resolve() != run:
+    if not pointer.get("run_dir") or (p.ROOT / Path(pointer["run_dir"])).resolve() != run:
         return "active_run_changed"
     if (status.get("state") in {"user_paused", "paused_waiting_user"}
             or pause.get("explicit_user_resume_required")
@@ -205,9 +206,11 @@ def publish(run, memory, phase, **values):
 
 
 def stop_reason(run):
+    pointer = optional(p.ROOT / "qwen/configs/active_run.json")
+    if not pointer:
+        pointer = optional(p.ROOT.parent / "outputs/sft_v5/active_run.json")
     return gate(p.read(run / "watchdog/control.json"), p.read(run / "status.json"),
-                optional(run / "pause_20261110/state.json"),
-                p.read(p.ROOT.parent / "outputs/sft_v5/active_run.json"), run)
+                optional(run / "pause_20261110/state.json"), pointer, run)
 
 
 def tick(run, memory, observe_only=False):
@@ -288,11 +291,11 @@ def tick(run, memory, observe_only=False):
     memory["stderr_offset"] = (run / "stderr.log").stat().st_size
     memory["restart_times"] = attempts + [started]
     publish(run, memory, "preparing_resume")
-    script = p.ROOT / "storymaker.qwen.code.hpo_sft.py" if config.get("phase") == "hpo" else SCRIPT
+    script = "hpo_sft.py" if config.get("phase") == "hpo" else "sft_v5_train.py"
     with (run / "stdout.log").open("ab") as output, (run / "stderr.log").open("ab") as error:
         child = subprocess.Popen(
-            [config["python"], "-X", "utf8", "-u", str(script), "--run-dir", str(run)],
-            cwd=p.ROOT, stdin=subprocess.DEVNULL, stdout=output, stderr=error,
+            p.worker_command(script, "--run-dir", run, python=config["python"]),
+            cwd=p.ROOT.parent, stdin=subprocess.DEVNULL, stdout=output, stderr=error,
             creationflags=subprocess.CREATE_NO_WINDOW,
         )
     p.save(run / "launcher.json", {**launcher, "pid": child.pid, "started_at_utc": started,
@@ -310,9 +313,7 @@ def main():
     parser.add_argument("--run-dir", type=Path, required=True)
     parser.add_argument("--once", action="store_true", help="observe only; never launch training")
     args = parser.parse_args()
-    run = args.run_dir.resolve()
-    if (p.ROOT / "outputs").resolve() not in run.parents:
-        raise ValueError("Run outside project outputs")
+    run = p.sft_result_path(args.run_dir)
     with (run / "watchdog/watchdog.lock").open("a+b") as handle:
         if not handle.tell():
             handle.write(b"0")

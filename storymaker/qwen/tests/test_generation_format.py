@@ -32,6 +32,19 @@ class GenerationFormatTests(unittest.TestCase):
             ],
         }
         self.assertEqual(generation.parse_story(json.dumps(story))[1], [])
+
+        scene = story["scenes"][0]
+        for scene_no in (True, 1.0, "1"):
+            with self.subTest(scene_no=scene_no):
+                scene["scene_no"] = scene_no
+                self.assertEqual(generation.parse_story(json.dumps(story))[1], ["invalid_scene_number_1"])
+        scene["scene_no"] = 1
+        for mode in ([], {}, None):
+            with self.subTest(text_mode=mode):
+                scene["text_mode"] = mode
+                self.assertEqual(generation.parse_story(json.dumps(story))[1], ["invalid_text_mode_1"])
+        scene["text_mode"] = "wordless"
+
         story["scenes"][0]["character_ids"] = ["unknown"]
         self.assertIn(
             "invalid_character_reference_1",

@@ -99,7 +99,8 @@ class WatchTests(unittest.TestCase):
         for _ in range(3):
             w.tick(self.run, self.memory)
         self.launch.assert_called_once()
-        self.assertIn("storymaker.qwen.code.hpo_sft.py", self.launch.call_args.args[0][4])
+        self.assertEqual(self.launch.call_args.args[0][3:5], ["-m", "storymaker.qwen.code.hpo_sft"])
+        self.assertEqual(self.launch.call_args.kwargs["cwd"], p.ROOT.parent)
 
     def test_unknown_error_and_restart_loop_require_inspection(self):
         self.memory["missing_polls"] = 2

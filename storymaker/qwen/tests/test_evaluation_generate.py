@@ -1,6 +1,8 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from storymaker.qwen.code import evaluation_generate as evaluation
@@ -9,7 +11,7 @@ class PairedGenerationTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.run = Path(self.temp.name) / "outputs/run"
+        self.run = Path(self.temp.name).resolve() / "outputs/run"
         self.output = self.run / "evaluation"
         self.context = {
             "config": {"python": "unused", "model_revision": "frozen-revision"},
@@ -35,6 +37,18 @@ class PairedGenerationTests(unittest.TestCase):
                 evaluation.completed_context(self.run)
             host.assert_not_called()
             generate.assert_not_called()
+
+    def test_training_process_check_recognizes_module_and_script_launches(self):
+        script = p.ROOT / "qwen/code/sft_v5_train.py"
+        rows = [
+            {"ProcessId": 7, "CommandLine": f'python -m storymaker.qwen.code.hpo_sft --run-dir "{self.run}"'},
+            {"ProcessId": 8, "CommandLine": f'python "{script}" --run-dir "{self.run}"'},
+            {"ProcessId": 9, "CommandLine": f'python -m storymaker.qwen.code.sft_v5_train --check-ready --run-dir "{self.run}"'},
+            {"ProcessId": 10, "CommandLine": 'python -m storymaker.qwen.code.hpo_sft --run-dir "elsewhere"'},
+        ]
+        result = SimpleNamespace(stdout=json.dumps(rows).encode("utf-8"))
+        with patch.object(evaluation.w.subprocess, "run", return_value=result):
+            self.assertEqual([row["ProcessId"] for row in evaluation.w.processes(self.run)], [7, 8])
 
     def test_pilot_uses_development_and_test_jobs_contain_only_moral(self):
         pilot = evaluation.jobs_for(self.run, self.output, self.context, self.manifest, "pilot")

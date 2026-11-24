@@ -33,15 +33,67 @@
 
 후속 보상안은 형식과 내용 보상을 나눠 훈련 대조를 점검했습니다. 반복과 인과 오류는 감점됐으나 정상 질문도 과하게 감점됐습니다. 사전 기준 8개 중 4개를 충족해 후보 채택을 보류했고, 이 실험의 모델 갱신은 0회입니다. [보상 검증 집계](reports/reward-validation.json)
 
-## 로컬 검증
+## 재현 순서
 
-Windows와 Python 3.11 환경에서 아래 명령을 저장소 루트에서 실행합니다. 이전 실행은 PyTorch 2.7.1과 CUDA 12.8을 사용했습니다. 아래 테스트는 CPU에서 실행됩니다.
+### 1. 환경과 로컬 자료 준비
 
-    python -m pip install -r requirements.txt
-    python -m unittest storymaker.data_augmentation.tests.test_augment storymaker.qwen.tests.test_generation_format storymaker.rlaif.tests.test_reward_pipeline storymaker.rlaif.tests.test_rlaif_objective
+Windows와 Python 3.11 환경에서 저장소 루트 기준으로 실행합니다. 본학습은 PyTorch 2.7.1과 CUDA 12.8을 사용했습니다. 아래 테스트는 CPU에서 실행됩니다.
 
-실험 재현에는 사용 권한이 있는 원작·v5 데이터, Qwen 가중치, 훈련 RAG 인덱스, 해당 실행의 설정과 체크포인트가 필요합니다. 데이터는 **storymaker/data/**, Qwen 기본 가중치는 **storymaker/qwen/models/original/**, 인덱스는 **storymaker/rlaif/rag/train200/**, BGE-M3 가중치는 **storymaker/rlaif/models/bge-m3/**에서 로컬로 관리합니다. **STORYMAKER_MODEL_PATH**로 Qwen 경로를 지정할 수 있습니다. 유료 API의 키는 Git에서 제외하는 **storymaker/secrets/api_key.yaml**에 로컬로 둡니다. 과거 실행을 대조하는 일부 테스트에는 해당 실행 기록도 필요합니다.
+```powershell
+python -m pip install -r requirements.txt
+python -m unittest storymaker.data_augmentation.tests.test_augment storymaker.qwen.tests.test_generation_format
+python -m unittest storymaker.qwen.tests.test_evaluation_generate storymaker.qwen.tests.test_evaluation_api storymaker.qwen.tests.test_evaluation_report
+python -m unittest storymaker.rlaif.tests.test_reward_pipeline storymaker.rlaif.tests.test_rlaif_objective storymaker.rlaif.tests.test_run_binding
+```
 
-데이터는 훈련200·검증43·이전 SFT 진단61·독립 테스트32 역할로 구분했습니다. 완성 모델과 생성·채점 원문은 프로젝트 실행 저장소에서 관리합니다.
+| 로컬 경로 | 준비할 자료 |
+|---|---|
+| `storymaker/data/raw/` · `storymaker/data/processed/v5/` | 사용 권한이 있는 원작과 v5 데이터셋, 토큰화·분할 파일 |
+| `storymaker/qwen/models/original/` | 원본 Qwen 가중치와 토크나이저. `STORYMAKER_MODEL_PATH`로 기본 모델 경로 지정 가능 |
+| `storymaker/rlaif/rag/train200/` · `storymaker/rlaif/models/bge-m3/` | 훈련 200편으로 고정한 `corpus.jsonl`, `embeddings.npy`, `prepared_manifest.json`과 BGE-M3 가중치 |
+| `storymaker/secrets/api_key.yaml` | 유료 API가 필요할 때 로컬에서 `openai_api_key` 값을 설정 |
+| `storymaker/qwen/results/` · `storymaker/rlaif/results/` | 보존된 실행 설정, 입력 해시, 체크포인트와 결과 |
+
+원작 수집본과 증강 중간 결과가 있으면 `data_augmentation`의 증강·검수·v5 정리 단계 순서로 사용합니다. 보존된 v5에서 시작할 때는 처리된 데이터와 고정된 원작 단위 분할을 함께 준비합니다. 개발 243편 중 200편은 RLAIF 훈련과 RAG에, 43편은 검증에 사용합니다. 기존 61편은 SFT 진단용이고 독립 32편은 최종 비교용입니다. 과거 실험 파일을 참조하는 테스트에는 해당 실행 기록도 필요합니다.
+
+### 2. LoRA SFT 학습과 고정 테스트 61편 채점
+
+1. 완료한 학습률 비교와 5-fold 결과, 인코딩된 개발 자료, 실행 설정을 준비합니다. 보존된 HPO 실행 폴더에서 이어갈 경우 `config.json`, `folds.json`, `encoded_development.json`, Optuna DB와 보호 해시 파일을 함께 둡니다. 그리드를 새로 구성할 때는 `hpo_sft --prepare-from`으로 완료한 학습률 비교를 불러오며, 보존한 단독 변경 두 결과가 있으면 `--reuse-screen-from`도 지정합니다. 새 실행의 보호 해시를 확인한 뒤 학습합니다.
+2. 최종 재학습이 완료된 실행 폴더를 생성·채점·집계에 동일하게 전달합니다. 기본 출력 위치는 실행 폴더 아래 `evaluation/`입니다. 별도 위치를 쓸 때는 세 명령에 같은 `--output-dir`을 전달합니다. 기존 `storymaker/outputs/`의 실행 폴더도 사용할 수 있습니다.
+3. 개발 파일럿 생성과 채점을 마친 뒤, 고정 테스트를 생성하고 채점합니다. `evaluation_api`는 기본적으로 계획만 저장합니다. 유료 채점 전에 실행 폴더의 `api_pricing_check.json`에 현재 한국 날짜(`checked_client_date`), 확인한 `model`, `prices_usd_per_million`을 기록하고 아래 설정과 대조합니다. [SFT API 설정](storymaker/qwen/configs/test61_api_settings.json)
+
+```powershell
+$sftRun = 'storymaker/qwen/results/sft_hpo_grid'
+python -m storymaker.qwen.code.hpo_sft --run-dir $sftRun
+python -m storymaker.qwen.code.evaluation_generate --run-dir $sftRun --split pilot
+python -m storymaker.qwen.code.evaluation_api --run-dir $sftRun --split pilot
+python -m storymaker.qwen.code.evaluation_api --run-dir $sftRun --split pilot --execute
+python -m storymaker.qwen.code.evaluation_generate --run-dir $sftRun --split test
+python -m storymaker.qwen.code.evaluation_api --run-dir $sftRun --split test
+python -m storymaker.qwen.code.evaluation_api --run-dir $sftRun --split test --execute
+python -m storymaker.qwen.code.evaluation_report --run-dir $sftRun
+```
+
+### 3. RLAIF 배치 갱신과 동일 교훈 검증
+
+1. 훈련 200개 교훈의 순서를 고정해 16편씩 12배치와 마지막 8편으로 나눕니다. 마지막에도 `logical_batch_size`는 16으로 두고 `batch_ids`에 남은 8개만 넣습니다. 각 실행 폴더에 모델·분할·배치 설정(`config.json`), 입력 및 코드 해시(`manifest.json`), 프롬프트, 보상 프로토콜과 준비 검증 결과를 둡니다. 첫 배치는 정책4·가치4에서 시작하고, 이후 배치는 직전에 검증된 정책·가치 및 옵티마이저 상태를 이어받습니다.
+2. [활성 실행 경로 예시](storymaker/rlaif/configs/active_run.example.json)를 같은 폴더의 `active_run.json`으로 복사하고, `run_dir`에 지금 실행할 결과 경로를 지정합니다. 설정 파일의 상대 경로는 `storymaker/` 기준입니다. 아래 명령은 배치 편수와 13개 단계의 계획을 저장합니다. `--execute`를 붙이면 생성 → 훈련용 RAG 검색 → API 채점 → 정책·가치 갱신 → 같은 검증 43편 비교로 이어집니다.
+
+```powershell
+python -m storymaker.rlaif.code.rlaif_cycle
+```
+
+3. 200편 본학습처럼 전체 순회 뒤에 검증할 경우에는 각 배치에서 다음 학습 단계만 차례대로 실행합니다. 유료 단계 전에 날짜별 단가와 공유 비용 장부를 확인합니다. 마지막 배치까지 실제 데이터 ID와 정책·가치 저장 기록을 검증한 뒤, 같은 검증 43편에서 정책4와 마지막 모델을 비교하고 고정 독립 32편으로 최종 진단합니다.
+
+```powershell
+python -m storymaker.rlaif.code.rlaif_generate
+python -m storymaker.rlaif.code.rlaif_reward_api --prepare-rag
+python -m storymaker.rlaif.code.rlaif_reward_api --execute
+python -m storymaker.rlaif.code.rlaif_sequence
+python -m storymaker.rlaif.code.rlaif_sequence --execute
+python -m storymaker.rlaif.code.rlaif_training_report
+```
+
+검증 생성에는 `rlaif_evaluate --split validation`을 사용합니다. 원본은 추가 인자 없이, 정책4와 마지막 정책은 각각 `--checkpoint`로 정책 폴더를 지정하고 `--execute`로 생성합니다. 각 정책의 생성이 완료되면 `rlaif_reward_evaluate --policy-tag <태그> --prepare-rag`로 검색 근거를 준비하고, 먼저 계획을 확인한 뒤 같은 태그에 `--execute`를 지정해 채점합니다. 독립 32편은 최종 선택을 기록하고 고정 교훈을 사용해 같은 순서로 진행합니다. 생성은 `--split final`, 채점은 `--phase final`을 지정합니다.
 
 [RLAIF 원 논문](https://arxiv.org/abs/2309.00267) · [Qwen3.5-4B](https://huggingface.co/Qwen/Qwen3.5-4B)

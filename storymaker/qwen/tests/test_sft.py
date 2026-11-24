@@ -14,10 +14,12 @@ class V5SFTTests(unittest.TestCase):
     def test_worker_fit_preserves_task_contract_and_checks_memory_release(self):
         expected = {"source_ids": [1, 3], "learning_rate": 8e-5, "epochs": 5}
         for free_mib, should_fail in ((15000, False), (10000, True)):
-            with tempfile.TemporaryDirectory(dir=p.RUN) as directory:
+            with tempfile.TemporaryDirectory() as directory:
                 folder = Path(directory) / "fold_2"
 
-                def child(command, check):
+                def child(command, cwd, check):
+                    self.assertEqual(command[3:5], ["-m", "storymaker.qwen.code.sft_v5_train"])
+                    self.assertEqual(cwd, p.ROOT.parent)
                     self.assertEqual(command[-2], "--fit-task")
                     self.assertTrue(check)
                     task = p.read(Path(command[-1]))

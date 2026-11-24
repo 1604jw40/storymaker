@@ -153,17 +153,8 @@ def worker_fit(
     p.save(task_file, task)
     status("starting_worker", stage=tag, learning_rate=learning_rate)
     subprocess.run(
-        [
-            config["python"],
-            "-X",
-            "utf8",
-            "-u",
-            str(Path(__file__).resolve()),
-            "--run-dir",
-            str(p.RUN),
-            "--fit-task",
-            str(task_file),
-        ],
+        p.worker_command("sft_v5_train.py", "--run-dir", p.RUN, "--fit-task", task_file, python=config["python"]),
+        cwd=p.ROOT.parent,
         check=True,
     )
     released = gpu_ready()
@@ -578,10 +569,7 @@ def main():
     parser.add_argument("--fit-task", type=Path)
     args = parser.parse_args()
     if args.run_dir is not None:
-        selected = args.run_dir.resolve()
-        if (p.ROOT / "outputs").resolve() not in selected.parents:
-            raise ValueError("실험 출력은 이 프로젝트 outputs 아래에 둡니다.")
-        p.RUN = selected
+        p.RUN = p.sft_result_path(args.run_dir)
     if args.check_ready:
         result = gpu_ready()
         print(json.dumps(result, ensure_ascii=False))

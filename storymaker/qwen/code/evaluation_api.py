@@ -179,15 +179,15 @@ def call_pair(directory, body, payload, settings, key):
     return judgment
 
 
-def evaluate(run, split, execute):
+def evaluate(run, split, execute, output=None):
     context = g.completed_context(run)
-    output = run / "evaluation"
+    output = output if output is not None else run / "evaluation"
     manifest = g.manifest_for(context)
     assert p.read(output / "generation_manifest.json") == manifest
     if split == "test":
         g.require_frozen_protocol(output, manifest)
-    settings_path = p.ROOT / "docs/test61_api_settings.json"
-    rubric_path = p.ROOT / "docs/test61_rubric.txt"
+    settings_path = p.ROOT / "qwen/configs/test61_api_settings.json"
+    rubric_path = p.ROOT / "rlaif/configs/quality_rubric.txt"
     settings, rubric = p.read(settings_path), rubric_path.read_text("utf-8")
     assert settings["model"] == "gpt-6.1-sol" and settings["reasoning_effort"] == "xhigh"
     assert settings["service_tier"] == "default" and settings["store"] is False and not settings["tools"]
@@ -222,10 +222,10 @@ def evaluate(run, split, execute):
     p.save(output / f"api_{split}_plan.json", plan)
     if not execute:
         return plan
-    pricing = p.read(p.ROOT / "reports/api_pricing_check.json")
+    pricing = p.read(run / "api_pricing_check.json")
     assert pricing["checked_client_date"] == datetime.now(timezone(timedelta(hours=9))).date().isoformat(), "Recheck official prices before execution"
     assert pricing["model"] == settings["model"] and pricing["prices_usd_per_million"] == settings["short_context_prices_usd_per_million"]
-    key = yaml.safe_load(Path(settings["credential_file"]).read_text("utf-8-sig"))["openai_api_key"]
+    key = yaml.safe_load((p.ROOT / settings["credential_file"]).read_text("utf-8-sig"))["openai_api_key"]
     assert isinstance(key, str) and key.strip()
     completed = []
     for pair in pairs:
@@ -247,22 +247,25 @@ def evaluate(run, split, execute):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-dir", type=Path, required=True)
+    parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--split", choices=("pilot", "test"), default="pilot")
     parser.add_argument("--execute", action="store_true", help="Send the planned API evaluation requests")
     args = parser.parse_args()
-    run = args.run_dir.resolve()
-    if (p.ROOT / "outputs").resolve() not in run.parents:
-        raise ValueError("Run outside project outputs")
-    assert Path(p.read(p.ROOT.parent / "outputs/sft_v5/active_run.json")["run_dir"]).resolve() == run, "Use the active SFT run"
-    with (p.ROOT / "outputs/evaluation_api.lock").open("a+b") as lock:
+    run = p.sft_result_path(args.run_dir)
+    output = p.sft_result_path(args.output_dir or run / "evaluation")
+    if not run.is_dir():
+        parser.error(f"SFT run directory does not exist: {run}")
+    lock_path = p.ROOT / "outputs/evaluation_api.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+b") as lock:
         if not lock.tell():
             lock.write(b"0"); lock.flush()
         lock.seek(0)
         msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
         try:
-            print(json.dumps(evaluate(run, args.split, args.execute), ensure_ascii=False))
+            print(json.dumps(evaluate(run, args.split, args.execute, output), ensure_ascii=False))
         except Exception as exc:
-            p.save(run / "evaluation/api_status.json", {"state": "needs_attention", "phase": args.split, "error_type": type(exc).__name__, "message": str(exc), "updated_at_utc": now()})
+            p.save(output / "api_status.json", {"state": "needs_attention", "phase": args.split, "error_type": type(exc).__name__, "message": str(exc), "updated_at_utc": now()})
             raise
 
 

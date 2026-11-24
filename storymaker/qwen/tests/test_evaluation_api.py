@@ -1,5 +1,6 @@
 import copy
 import json
+import sys
 import tempfile
 import unittest
 from decimal import Decimal
@@ -134,6 +135,47 @@ class APIEvaluationTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "has not completed"):
                 api.evaluate(run, "pilot", True)
             network.assert_not_called()
+
+    def test_cli_plans_from_the_generation_output_without_a_global_pointer(self):
+        root = Path(self.temp.name).resolve()
+        settings_path = "qwen/configs/test61_api_settings.json"
+        rubric_path = "rlaif/configs/quality_rubric.txt"
+        for path in (settings_path, rubric_path):
+            target = root / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes((p.ROOT / path).read_bytes())
+        manifest = {"sha256": "fixed", "identity": {"pilot_ids": [1, 2, 3]}}
+        context = {
+            "books": [{"source_id": i, "input": {"moral": "친절"}} for i in range(1, 4)],
+            "config": {"model_revision": "original"},
+            "adapter": root / "adapter",
+        }
+        for run, custom in ((root / "qwen/results/refit", False), (root / "outputs/legacy", True)):
+            with self.subTest(run=run):
+                output = root / "qwen/results/alternate" if custom else run / "evaluation"
+                args = ["--output-dir", str(output)] if custom else []
+                p.save(output / "generation_manifest.json", manifest)
+                run.mkdir(parents=True, exist_ok=True)
+                for job in api.g.jobs_for(run, output, context, manifest, "pilot"):
+                    generation = {
+                        **self.payload["A"], "moral": job["moral"], "model_variant": job["variant"],
+                        "adapter": str(context["adapter"]) if job["variant"] == "sft" else None,
+                        "decoding": api.g.generation.DECODING, "seed": 42, "base_model_revision": "original",
+                    }
+                    p.save(job["output"], {"state": "completed", "job": job, "generation": generation})
+                with patch.object(p, "ROOT", root), patch.object(api.g, "completed_context", return_value=context), \
+                     patch.object(api.g, "manifest_for", return_value=manifest), patch.object(api.requests, "post") as request:
+                    with patch.object(sys, "argv", ["generate", "--run-dir", str(run), *args]):
+                        api.g.main()
+                    with patch.object(sys, "argv", ["evaluate", "--run-dir", str(run), *args]):
+                        api.main()
+                    request.assert_not_called()
+                self.assertEqual(p.read(output / "generation_status.json")["completed_outputs"], 6)
+                self.assertEqual(p.read(output / "api_pilot_plan.json")["pairs"], 3)
+                self.assertFalse(p.read(output / "api_pilot_plan.json")["execute"])
+        with patch.object(p, "ROOT", root):
+            with self.assertRaises(ValueError):
+                p.sft_result_path(root.parent / "outside")
 
     def test_pilot_keeps_model_failures_but_rejects_wrong_classification(self):
         output = Path(self.temp.name)

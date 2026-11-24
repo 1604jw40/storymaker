@@ -163,28 +163,58 @@ class RewardPipeline(unittest.TestCase):
             reward.p.save(prior, {'stage': 'needs_attention', 'message': 'train_reward failed; preserve logs, no automatic restart'})
             reward.p.save(folder/'cycle_state.json', {'stage': 'needs_attention'})
             sources = []
-            for i in range(16):
+            count = 8
+            batch = root/'batch_0012'
+            for i in range(count):
                 source = root/'rollouts'/f'{i}.json'; reward.p.save(source, {'id': i})
                 sources.append({'source': str(source), 'source_sha256': reward.api.rag.sha(source)})
             collection = root/'environment/collection_verified.json'; rag = root/'environment/train_RAG_verified.json'
-            reward.p.save(collection, {'passed': True, 'N': 16, 'config_sha256': 'cfg', 'rows': sources})
-            reward.p.save(rag, {'passed': True, 'contexts': 16, 'source_sha256': {r['source']: r['source_sha256'] for r in sources}})
+            reward.p.save(collection, {'passed': True, 'N': count, 'config_sha256': 'cfg', 'rows': sources})
+            reward.p.save(rag, {'passed': True, 'contexts': count, 'source_sha256': {r['source']: r['source_sha256'] for r in sources}})
             authorization = {'passed': True, 'resume_from': 'train_reward', 'config_sha256': 'cfg', 'runtime_code_sha256': {},
                 'previous_state_file': str(prior), 'previous_state_sha256': reward.api.rag.sha(prior),
                 'evidence_sha256': {str(f): reward.api.rag.sha(f) for f in [collection, rag]}}
             reward.p.save(folder/'resume_authorization.json', authorization)
-            self.assertEqual(rlaif_cycle.resume_inputs(folder, 'cfg', {}), authorization)
+            self.assertEqual(rlaif_cycle.resume_inputs(folder, 'cfg', {}, batch, count), authorization)
             with self.assertRaises(AssertionError):
-                rlaif_cycle.resume_inputs(folder, 'wrong-config', {})
+                rlaif_cycle.resume_inputs(folder, 'cfg', {}, batch, 16)
             with self.assertRaises(AssertionError):
-                rlaif_cycle.resume_inputs(folder, 'cfg', {'changed-code': 'x'})
+                rlaif_cycle.resume_inputs(folder, 'wrong-config', {}, batch, count)
+            with self.assertRaises(AssertionError):
+                rlaif_cycle.resume_inputs(folder, 'cfg', {'changed-code': 'x'}, batch, count)
             reward.p.save(folder/'cycle_state.json', {'stage': 'running_child'})
             with self.assertRaises(AssertionError):
-                rlaif_cycle.resume_inputs(folder, 'cfg', {})
+                rlaif_cycle.resume_inputs(folder, 'cfg', {}, batch, count)
             reward.p.save(folder/'cycle_state.json', {'stage': 'needs_attention'})
+            receipt = batch/'update_policy_verified.json'
+            reward.p.save(receipt, {'saved': True})
+            with self.assertRaises(AssertionError):
+                rlaif_cycle.resume_inputs(folder, 'cfg', {}, batch, count)
+            receipt.unlink()
             reward.p.save(Path(sources[0]['source']), {'id': 'changed'})
             with self.assertRaises(AssertionError):
-                rlaif_cycle.resume_inputs(folder, 'cfg', {})
+                rlaif_cycle.resume_inputs(folder, 'cfg', {}, batch, count)
+
+    def test_cycle_plans_a_full_batch_and_the_last_eight_without_workers(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for count in (16, 8):
+                with self.subTest(count=count):
+                    run = Path(directory)/str(count)
+                    records = list(range(1, 17))
+                    config = {'batch_ids': records[-count:], 'logical_batch_size': 16, 'train_ids': records,
+                              'validation_ids': [18], 'excluded_test_ids': [19], 'max_new_tokens': 64,
+                              'learning_rate': 0.0001, 'temperature': 0.7, 'kl_beta': 0.1, 'top_p': 1,
+                              'top_k': 0, 'rag_required': True, 'value_baseline_bounds': [-1, 1],
+                              'policy_checkpoint': str(run/'checkpoints/update_0017/policy'), 'update_index': 18}
+                    reward.p.save(run/'config.json', config)
+                    reward.p.save(run/'manifest.json', {'config_sha256': reward.api.rag.sha(run/'config.json'),
+                                                        'runtime_code_sha256': {}})
+                    with patch.object(rlaif_cycle, 'OUT', run), patch.object(rlaif_cycle.subprocess, 'Popen') as launch, \
+                         patch('builtins.print') as output:
+                        rlaif_cycle.main(execute=False)
+                        launch.assert_not_called()
+                    self.assertEqual(json.loads(output.call_args.args[0])['batch_size'], count)
+                    self.assertTrue((run/'pipeline/cycle_plan.json').is_file())
 
     def test_explicit_dispatch_and_cycle_has_previous_comparison(self):
         context = {'reward_protocol_kind': reward.PROTOCOL}

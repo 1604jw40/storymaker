@@ -100,8 +100,7 @@ def jobs_for(run, output, context, manifest, split):
 def worker(run, job_path):
     context = completed_context(run)
     job = p.read(job_path)
-    output = Path(job["output_dir"]).resolve()
-    assert (p.ROOT / "outputs").resolve() in output.parents
+    output = p.sft_result_path(job["output_dir"])
     manifest = p.read(output / "generation_manifest.json")
     assert manifest["sha256"] == signature(manifest["identity"])
     assert job in jobs_for(run, output, context, manifest, job["split"])
@@ -152,9 +151,10 @@ def batch(run, output, split):
                    "updated_at_utc": datetime.now(timezone.utc).isoformat()})
             result_path.parent.mkdir(parents=True, exist_ok=True)
             with result_path.with_suffix(".stdout.log").open("a", encoding="utf-8") as out, result_path.with_suffix(".stderr.log").open("a", encoding="utf-8") as err:
-                result = subprocess.run([context["config"]["python"], "-X", "utf8", "-u", str(Path(__file__).resolve()),
-                          "--run-dir", str(run), "--worker-job", str(job_path)], stdout=out, stderr=err,
-                          creationflags=subprocess.CREATE_NO_WINDOW)
+                command = p.worker_command("evaluation_generate.py", "--run-dir", run, "--worker-job", job_path,
+                                           python=context["config"]["python"])
+                result = subprocess.run(command, cwd=p.ROOT.parent, stdout=out, stderr=err,
+                                        creationflags=subprocess.CREATE_NO_WINDOW)
             if result.returncode or not result_path.exists():
                 p.save(failure, {"job": job, "returncode": result.returncode, "automatic_retry": False})
                 raise RuntimeError(f"Generation worker failed; inspect {failure}")
@@ -176,14 +176,14 @@ def main():
     parser.add_argument("--split", choices=("pilot", "test"), default="pilot")
     parser.add_argument("--worker-job", type=Path)
     args = parser.parse_args()
-    run = args.run_dir.resolve()
-    output = (args.output_dir or run / "evaluation").resolve()
-    if any((p.ROOT / "outputs").resolve() not in path.parents for path in (run, output)):
-        raise ValueError("Evaluation must stay inside project outputs")
+    run = p.sft_result_path(args.run_dir)
+    output = p.sft_result_path(args.output_dir or run / "evaluation")
     if args.worker_job:
         worker(run, args.worker_job)
         return
-    with (p.ROOT / "outputs/generation.lock").open("a+b") as lock:
+    lock_path = p.ROOT / "outputs/generation.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+b") as lock:
         if not lock.tell():
             lock.write(b"0")
             lock.flush()

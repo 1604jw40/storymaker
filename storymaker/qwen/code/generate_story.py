@@ -62,7 +62,8 @@ def parse_story(text):
             isinstance(item, str) and item in ids for item in references
         ):
             problems.append(f"invalid_character_reference_{number}")
-        if scene.get("scene_no") != number:
+        scene_no = scene.get("scene_no")
+        if type(scene_no) is not int or scene_no != number:
             problems.append(f"invalid_scene_number_{number}")
         if not all(
             isinstance(scene.get(key), str)
@@ -70,7 +71,7 @@ def parse_story(text):
         ):
             problems.append(f"invalid_scene_fields_{number}")
         mode, body = scene.get("text_mode"), scene.get("text")
-        if mode not in {"read_aloud", "wordless"} or (
+        if not isinstance(mode, str) or mode not in {"read_aloud", "wordless"} or (
             (mode == "wordless" and body != "")
             or (
                 mode == "read_aloud" and (not isinstance(body, str) or not body.strip())

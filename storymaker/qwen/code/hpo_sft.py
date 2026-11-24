@@ -86,7 +86,8 @@ def prepare(run, source, screen_source=None):
                   objective="screen fold1; select by common-epoch mean of all5fold; test excluded")
     reused_files = []
     if screen_source is not None:
-        if (p.ROOT / "outputs").resolve() not in screen_source.parents or screen_source in (run, source):
+        screen_source = p.sft_result_path(screen_source)
+        if screen_source in (run, source):
             raise ValueError("Invalid prior screening run")
         if w.lock_held(screen_source / "run.lock") or w.lock_held(screen_source / "watchdog/watchdog.lock") or w.processes(screen_source):
             raise ValueError("Prior screening run still has a live owner")
@@ -324,9 +325,7 @@ def main():
     parser.add_argument("--prepare-from", type=Path)
     parser.add_argument("--reuse-screen-from", type=Path)
     args = parser.parse_args()
-    p.RUN = args.run_dir.resolve()
-    if (p.ROOT / "outputs").resolve() not in p.RUN.parents:
-        raise ValueError("Run must remain inside project outputs")
+    p.RUN = p.sft_result_path(args.run_dir)
     if args.prepare_from:
         prepare(p.RUN, args.prepare_from.resolve(), args.reuse_screen_from.resolve() if args.reuse_screen_from else None)
         return

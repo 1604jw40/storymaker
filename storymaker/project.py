@@ -32,6 +32,15 @@ def save(path, value):
     temporary.replace(path)
 
 
+def sft_result_path(path):
+    """Keep SFT training and evaluation under the same project-owned result roots."""
+    resolved = Path(path).resolve()
+    roots = (ROOT / "qwen/results", ROOT / "outputs")
+    if not any(root.resolve() in resolved.parents for root in roots):
+        raise ValueError("SFT results must stay under storymaker/qwen/results or storymaker/outputs")
+    return resolved
+
+
 def check_folds(folds, dev_ids, test_ids):
     """같은 원작은 train/validation/test를 넘나들지 않는다."""
     assert len(folds) == 5 and len(dev_ids) == 243 and len(test_ids) == 61

@@ -112,10 +112,10 @@ def summarize(report, test_ids, outputs, development):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-dir", type=Path, required=True)
+    parser.add_argument("--output-dir", type=Path)
     args = parser.parse_args()
-    run = args.run_dir.resolve()
-    assert (p.ROOT / "outputs").resolve() in run.parents
-    output = run / "evaluation"
+    run = p.sft_result_path(args.run_dir)
+    output = p.sft_result_path(args.output_dir or run / "evaluation")
     context = g.completed_context(run)
     manifest = g.manifest_for(context)
     assert p.read(output / "generation_manifest.json") == manifest

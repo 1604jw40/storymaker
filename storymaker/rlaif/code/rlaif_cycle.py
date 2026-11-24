@@ -10,7 +10,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from storymaker import project as p
-from storymaker.rlaif.code.rlaif_environment import OUT, GPU_LOCK, validate_settings
+from storymaker.rlaif.code.rlaif_environment import ACTIVE_RUN, OUT, GPU_LOCK, validate_settings
 from storymaker.rlaif.code.rlaif_sequence import lock_free, gpu_ready
 from storymaker.rlaif.code.rlaif_reward_api import save
 from storymaker.rlaif.code.rlaif_budget import lock_path
@@ -62,7 +62,7 @@ def compare(config):
     return result
 
 
-def resume_inputs(folder, config_sha, runtime):
+def resume_inputs(folder, config_sha, runtime, batch, count):
     authorization = p.read(folder/'resume_authorization.json')
     assert authorization['passed'] and authorization['resume_from'] == 'train_reward'
     assert authorization['config_sha256'] == config_sha and authorization['runtime_code_sha256'] == runtime
@@ -75,20 +75,21 @@ def resume_inputs(folder, config_sha, runtime):
         assert sha(path) == authorization['evidence_sha256'][str(path)]
         proof = p.read(path)
         if name == 'collection_verified.json':
-            assert proof['config_sha256'] == config_sha and len(proof['rows']) == 16
-        assert proof['passed'] and proof.get('N', proof.get('contexts')) == 16
+            assert proof['config_sha256'] == config_sha and len(proof['rows']) == count
+        assert proof['passed'] and proof.get('N', proof.get('contexts')) == count
         sources = proof.get('source_sha256', {})
         if isinstance(sources, dict):
             assert all(sha(Path(path)) == digest for path, digest in sources.items())
         if name == 'collection_verified.json':
             assert all(sha(Path(row['source'])) == row['source_sha256'] for row in proof['rows'])
-    assert not (folder.parent/'batch_0000/update_policy_verified.json').exists()
+    assert not (batch/'update_policy_verified.json').exists()
     return authorization
 
 
 def main(execute, resume_from=None):
     config = p.read(OUT/'config.json')
-    assert len(validate_settings(config)) == 16
+    count = len(validate_settings(config))
+    batch = OUT/f"batch_{config.get('batch_index', 0):04d}"
     folder = OUT/'pipeline'
     folder.mkdir(exist_ok=True)
     manifest = p.read(OUT/'manifest.json')
@@ -100,7 +101,7 @@ def main(execute, resume_from=None):
     else:
         save(folder/'cycle_plan.json', plan)
     if not execute:
-        print(json.dumps({'plan_only': True, 'stages': len(plan['commands']), 'new_API_calls': 0}))
+        print(json.dumps({'plan_only': True, 'batch_size': count, 'stages': len(plan['commands']), 'new_API_calls': 0}))
         return
 
     def enabled():
@@ -108,7 +109,7 @@ def main(execute, resume_from=None):
 
     def guard():
         assert sha(OUT/'config.json') == config_sha
-        assert Path(p.read(p.ROOT/'rlaif/configs/active_run.json')['run_dir']).resolve() == OUT
+        assert (p.ROOT/Path(p.read(ACTIVE_RUN)['run_dir'])).resolve() == OUT
         assert all(sha(p.code_path(name)) == digest for name, digest in plan['code_sha256'].items())
         readiness = p.read(OUT/'environment/training_readiness.json')
         assert readiness['passed'] and readiness['config_sha256'] == config_sha
@@ -146,7 +147,7 @@ def main(execute, resume_from=None):
             assert not (folder/'cycle_state.json').exists(), 'Inspect any earlier run; never restart automatically'
             tasks = plan['commands']; logs = folder
         else:
-            resume_inputs(folder, config_sha, plan['code_sha256'])
+            resume_inputs(folder, config_sha, plan['code_sha256'], batch, count)
             tasks = plan['commands'][2:]
             assert tasks[0][0] == resume_from
             logs = folder/'resumed_train_reward'/sha(folder/'resume_authorization.json')[:16]
